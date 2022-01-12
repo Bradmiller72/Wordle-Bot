@@ -101,7 +101,7 @@ def get_all_channel_messages_before(channel_id, id=0):
         url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
 
     r = requests.get(url, headers=headers)
-
+    
     return r.json()
 
 def get_all_channel_messages(channel_id):
