@@ -1,6 +1,7 @@
 import discord
 import requests
 from datetime import date
+from datetime import timedelta
 from ratelimit import limits, sleep_and_retry
 import re
 import json
@@ -14,9 +15,29 @@ token = os.environ.get("DISCORD_BOT_TOKEN")
 channel_id = os.environ.get("DISCORD_CHANNEL_ID")
 pattern = re.compile(r"Wordle\s(\d+)\s([X\d])/6")
 
-X_WEIGHT = 7
+X_WEIGHT = 8
 
-#
+black_tokens = ["<:dealwithit:909637718131228712>", "<:babyPunch:866867781378375690>", "<:disappoint:806271529796894780>",
+    "<:michaelcera:802781343926321173>", "<:thisguy:917530795663585280>", "<:PUGGERS:921828086234886215>"]
+yellow_tokens = ["<:fieri:820478494462705705>", "<:pika:804160423922368566>", "<:justright:803699314220072993>", "<:AngySponge:876638662664790036>", "<:elmo:803074047565889566>"]
+green_tokens = ["<:hmm:848946269133209610>", "<:pepeknife:802342853460099082>", "<:monkaW:921828961774895144>", 
+    "<:Pepega:921828917403344927>", "<:POGGERS:803702292075249695>", "<:POGGERSDOWN:803702045906698261>", "<:Bradge:922902962718801971>", 
+    "<:HYPERS:921829124870381680>", "<:PepeHands:921828724012359701>"]
+
+black_square = b"\xe2\xac\x9b"
+white_square = b"\xe2\xac\x9c"
+yellow_square = b"\xf0\x9f\x9f\xa8"
+green_square = b"\xf0\x9f\x9f\xa9"
+
+# wordle: {
+#   num: {
+#       avg: x
+        # num: x
+        # total: x
+        # date: x
+# }
+# 
+# }
 # author_id: {
 #  name
 #  stats: {
@@ -27,12 +48,110 @@ X_WEIGHT = 7
 # current_total
 # }
 
+wordle = {
+
+}
+
 stats = {
 
 }
 
+def get_previous_week():
+    days_to_get = date.today().weekday() + 1
+    prevous_week = days_to_get + 7
+    current_wordle = 0
+    today = date.today()
+    yesterday = today - timedelta(days = 1)
+    for key, value in wordle.items():
+        if(value['date'] == today.strftime("%d%m%Y")):
+            current_wordle = int(key)
+            break
+        elif(value['date'] == yesterday.strftime("%d%m%Y")):
+            current_wordle = int(key) + 1
+            break
+
+    return_wordles = []
+    for i in range(days_to_get, prevous_week):
+        return_wordles.append(int(current_wordle) - int(i))
+    print(return_wordles)
+    return return_wordles
+
+def get_week():
+    days_to_get = date.today().weekday() + 1
+    current_wordle = 0
+    today = date.today()
+    yesterday = today - timedelta(days = 1)
+    for key, value in wordle.items():
+        if(value['date'] == today.strftime("%d%m%Y")):
+            current_wordle = int(key)
+            break
+        elif(value['date'] == yesterday.strftime("%d%m%Y")):
+            current_wordle = int(key) + 1
+            break
+
+    return_wordles = []
+    for i in range(0, days_to_get):
+        return_wordles.append(int(current_wordle) - int(i))
+
+    return return_wordles
+
+def get_stats_for_week(week):
+    temp = {}
+    for key, value in stats.items():
+        total = 0
+        amount = 0
+        name = value['name']
+        for wordle_num in value['stats']:
+            if(int(wordle_num) in week):
+                total += 1
+                amount += value['stats'][wordle_num]
+
+        current_stat = amount/total
+        temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s\n" % (name, str(round(current_stat, 2)), str(total))
+
+    ordered_list = sorted(temp.keys())
+
+    i = 1
+    return_str = ""
+    for key in ordered_list:
+        return_str += "%d. %s" % (i, temp[key])
+        i += 1
+
+    return return_str
+
+def is_valid_token(c, black_token, yellow_token, green_token):
+    if(c == black_square or c == white_square):
+        return black_token
+    elif(c == yellow_square):
+        return yellow_token
+    elif(c == green_square):
+        return green_token
+    else:
+        return None
+
+def generate_new_hidden_puzzle(puzzle):
+    random.seed(random.random())
+    black_token = random.choice(black_tokens)
+    yellow_token = random.choice(yellow_tokens)
+    green_token = random.choice(green_tokens)
+    word_length = 5
+    i = 0
+    to_return = ""
+    for c in puzzle:
+        character = c.encode('utf-8')
+        token = is_valid_token(character, black_token, yellow_token, green_token)
+        if(token):
+            to_return += token
+            i += 1
+
+        if (i == word_length):
+            to_return += "\n"
+            i = 0
+
+    return to_return
+
 def is_wordle_comment(comment):
-    return pattern.match(comment)
+    return pattern.search(comment)
 
 def new_valid_comment(author_id, name, match):
     wordle_number = match.group(1)
@@ -47,7 +166,19 @@ def new_valid_comment(author_id, name, match):
             "current_total": 0
         }
 
+    if(not (wordle_number in wordle)):
+        wordle[wordle_number] = {
+            "average": 0,
+            "number": 0,
+            "total": 0,
+            "date": date.today().strftime("%d%m%Y")
+        }
+
     if(not (wordle_number in stats[author_id]["stats"])):
+        wordle[wordle_number]["number"] += wordle_value
+        wordle[wordle_number]["total"] += 1
+        wordle[wordle_number]["average"] += wordle[wordle_number]["number"] / wordle[wordle_number]["total"]
+
         stats[author_id]["name"] = name
         stats[author_id]["stats"][wordle_number] = wordle_value
         stats[author_id]["total_num"] += 1
@@ -81,6 +212,9 @@ def get_help():
     return_str += "!join - this will add you to the current wordle thread.\n"
     return_str += "!help - display help information\n"
     return_str += "!rank - display server rankings\n"
+    return_str += "!rng - reply rng to a wordle result and it will output a randomly generated tile of your wordle results.\n"
+    return_str += "!week - display this weeks server rankings\n"
+    return_str += "!previousweek - display the previous weeks server rankings\n"
     return_str += "!stats <id> - right click user and \"Copy Id\" to get the user's id and display their stats\n"
     return_str += "Putting your wordle daily share in the chat will add it to the stats and then add you to the thread.\n"
 
@@ -160,6 +294,10 @@ async def on_message(message):
         
         if match:
             new_valid_comment(str(message.author.id), message.author.name, match)
+            
+        if message.content.startswith('!rng') and message.reference is not None:
+            reply_message = await message.channel.fetch_message(message.reference.message_id)
+            await message.channel.send(generate_new_hidden_puzzle(reply_message.content), reference=message)
 
         if message.content.startswith('!rank'):
             await message.channel.send(print_rank())
@@ -168,8 +306,16 @@ async def on_message(message):
             id = message.content.split(" ")[1]
             await message.channel.send(print_stats(id))
 
-        if message.content.startswith('!help'):
+        if message.content == '!help':
             await message.channel.send(get_help())
+
+        if message.content.startswith('!week'):
+            week = get_week()
+            await message.channel.send(get_stats_for_week(week))
+
+        if message.content.startswith('!previousweek'):
+            week = get_previous_week()
+            await message.channel.send(get_stats_for_week(week))
 
 
     print('Message from {0.author}: {0.content}'.format(message))
