@@ -100,14 +100,32 @@ def get_stats_for_week(week):
     for key, value in stats.items():
         total = 0
         amount = 0
+        missed = 0
         name = value['name']
-        for wordle_num in value['stats']:
-            if(int(wordle_num) in week):
+        for wordle_num in week:
+            if(str(wordle_num) in value['stats']):
                 total += 1
-                amount += value['stats'][wordle_num]
+                amount += value['stats'][str(wordle_num)]
+            else:
+                total += 1
+                missed += 1
+                amount += 8
 
-        current_stat = amount/total
-        temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s\n" % (name, str(round(current_stat, 2)), str(total))
+        # for wordle_num in value['stats']:
+        #     if(int(wordle_num) in week):
+        #         total += 1
+        #         amount += value['stats'][wordle_num]
+        #     else:
+        #         total += 1
+        #         missed += 1
+        #         amount += 8
+
+        if(total != 0):
+            current_stat = amount/total
+            if(missed == 0):
+                temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s\n" % (name, str(round(current_stat, 2)), str(total))
+            else:
+                temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s, Missed: %s\n" % (name, str(round(current_stat, 2)), str(total-missed), str(missed))
 
     ordered_list = sorted(temp.keys())
 
