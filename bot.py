@@ -1,11 +1,12 @@
 import discord
 import requests
-from datetime import date
+from datetime import date, datetime
 from datetime import timedelta
 from ratelimit import limits, sleep_and_retry
 import re
 import json
 import os
+os.environ['TZ'] = "America/Chicago"
 import random
 
 EIGHT_SECONDS = 8
@@ -73,7 +74,7 @@ def get_previous_week():
     return_wordles = []
     for i in range(days_to_get, prevous_week):
         return_wordles.append(int(current_wordle) - int(i))
-    print(return_wordles)
+
     return return_wordles
 
 def get_week():
@@ -171,7 +172,7 @@ def generate_new_hidden_puzzle(puzzle):
 def is_wordle_comment(comment):
     return pattern.search(comment)
 
-def new_valid_comment(author_id, name, match):
+def new_valid_comment(author_id, name, match, currDate):
     wordle_number = match.group(1)
     wordle_value = 7 if match.group(2) == "X" else int(match.group(2))
 
@@ -189,7 +190,7 @@ def new_valid_comment(author_id, name, match):
             "average": 0,
             "number": 0,
             "total": 0,
-            "date": date.today().strftime("%d%m%Y")
+            "date": currDate.strftime("%d%m%Y")
         }
 
     if(not (wordle_number in stats[author_id]["stats"])):
@@ -264,7 +265,7 @@ def get_all_channel_messages(channel_id):
         for item in r_json:
             match = is_wordle_comment(item['content'])
             if(match):
-                new_valid_comment(item['author']['id'], item['author']['username'], match)
+                new_valid_comment(item['author']['id'], item['author']['username'], match, datetime.strptime(item['timestamp'], "%Y-%m-%dT%H:%M:%S.%f%z"))
 
         r_json = get_all_channel_messages_before(channel_id, before_id)
 
@@ -285,7 +286,6 @@ async def create_thread(self,name,minutes):
     }
 
     r = requests.post(url,headers=headers,json=data)
-    print(r)
     r_json = r.json()
     return r_json['id']
 
@@ -311,7 +311,7 @@ async def on_message(message):
             await message.channel.add_member_to_thread(thread_id=thread_id, author_id=message.author.id)
         
         if match:
-            new_valid_comment(str(message.author.id), message.author.name, match)
+            new_valid_comment(str(message.author.id), message.author.name, match, message.created_at)
             
         if message.content.startswith('!rng') and message.reference is not None:
             reply_message = await message.channel.fetch_message(message.reference.message_id)
