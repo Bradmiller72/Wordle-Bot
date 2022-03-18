@@ -15,6 +15,7 @@ client = discord.Client()
 token = os.environ.get("DISCORD_BOT_TOKEN")
 channel_id = os.environ.get("DISCORD_CHANNEL_ID")
 pattern = re.compile(r"Wordle\s(\d+)\s([X\d])/6")
+thread_pattern = re.compile(r"Wordle\s\d+")
 
 X_WEIGHT = 8
 
@@ -125,6 +126,8 @@ def get_stats_for_week(week):
             current_stat = amount/total
             if(missed == 0):
                 temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s\n" % (name, str(round(current_stat, 2)), str(total))
+            elif(total == 0):
+                pass
             else:
                 temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s, Missed: %s\n" % (name, str(round(current_stat, 2)), str(total-missed), str(missed))
 
@@ -171,6 +174,9 @@ def generate_new_hidden_puzzle(puzzle):
 
 def is_wordle_comment(comment):
     return pattern.search(comment)
+
+def is_thread_comment(comment):
+    return thread_pattern.search(comment)
 
 def new_valid_comment(author_id, name, match, currDate):
     wordle_number = match.group(1)
@@ -282,12 +288,14 @@ async def create_thread(self,name,minutes):
         "name" : name,
         "type" : 11,
         "auto_archive_duration" : minutes,
-        "invitable": True
+        "invitable": True,
+        "nsfw": True
     }
 
     r = requests.post(url,headers=headers,json=data)
     r_json = r.json()
-    return r_json['id']
+    thread_id = r_json['id']
+    return thread_id
 
 @client.event
 async def on_ready():
@@ -296,6 +304,9 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if message.author == client.user:
+        match = is_thread_comment(message.content)
+        if(match):
+           await message.delete()
         return
     if str(message.channel.id) == channel_id:
         match = is_wordle_comment(message.content)
