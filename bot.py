@@ -126,7 +126,7 @@ def get_stats_for_week(week):
             current_stat = amount/total
             if(missed == 0):
                 temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s\n" % (name, str(round(current_stat, 2)), str(total))
-            elif(total == 0):
+            elif((total-missed) == 0):
                 pass
             else:
                 temp[current_stat+(random.random()/1000000)] = "%s - Average: %s, Total: %s, Missed: %s\n" % (name, str(round(current_stat, 2)), str(total-missed), str(missed))
